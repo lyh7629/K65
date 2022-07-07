@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"/>
+    <title>K65 ETA</title>
+    <link rel="stylesheet" href="https://unpkg.com/buefy/dist/buefy.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.8.55/css/materialdesignicons.min.css">
+</head>
+<body>
+<div id="app" class="columns is-mobile">
+    <div class="column">
+        <template>
+            <section>
+                <b-tabs v-model="activeTab">
+                    <b-tab-item label="往天水圍/元朗">
+                        <div class="is-size-4 has-text-weight-bold">
+                            新慶村
+                        </div>
+                        <table class="table" id="D020">
+                        </table>
+                    </b-tab-item>
+                    <b-tab-item label="往流浮山">
+                        <div>
+                            <div class="is-size-4 has-text-weight-bold">
+                                輕鐵坑尾村站
+                            </div>
+                            <table id="U110" class="table">
+                            </table>
+                        </div>
+                        <br>
+                        <div>
+                            <div class="is-size-4 has-text-weight-bold">
+                                天水圍站 (輕鐵天水圍站)
+                            </div>
+                            <table id="U010" class="table">
+                            </table>
+                        </div>
+                        <br>
+                        <div>
+                            <div class="is-size-4 has-text-weight-bold">
+                                天盛苑 (港鐵天水圍站)
+                            </div>
+                            <table id="U120" class="table"></table>
+                        </div>
+                    </b-tab-item>
+                </b-tabs>
+            </section>
+        </template>
+    </div>
+</div>
+
+<script src="https://unpkg.com/vue@2"></script>
+<!-- Full bundle -->
+<script src="https://unpkg.com/buefy/dist/buefy.min.js"></script>
+
+<!-- Individual components -->
+<script src="https://unpkg.com/buefy/dist/components/table"></script>
+<script src="https://unpkg.com/buefy/dist/components/input"></script>
+
+<script>
+    new Vue({
+        el: '#app',
+        data: {},
+        method: {}
+    });
+
+    var k65Data = fetchLineEta("K65");
+    var k65AData = fetchLineEta("K65A");
+
+    async function fetchLineEta(line) {
+        let respond = await fetch('https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule', {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "language": "zh",
+                "routeName": line
+            })
+        });
+
+        return await respond.json();
+    }
+
+    async function updateData() {
+        k65Data = await fetchLineEta("K65");
+        k65AData = await fetchLineEta("K65A");
+    }
+
+    function buildEtaStringByBus(bus) {
+        var time = new Date();
+        time.setSeconds(time.getSeconds() + parseInt(bus.arrivalTimeText? bus.arrivalTimeInSecond : bus.departureTimeText));
+        return "<tr><td>" + (bus.lineRef.startsWith("K65A") ? "K65A" : "K65") + "</td>"
+            + "<td>#" + bus.busId + "</td>"
+            + "<td>" + (bus.arrivalTimeText ? bus.arrivalTimeText : bus.departureTimeText) + "</td>"
+            + "<td>(" + time.toLocaleTimeString() + ")</td>"
+            + "<td>" + (bus.isScheduled == 1 ? " 預定班次" : "") + "</td>"
+            + "<td>" + (bus.isDelayed == 1 ? " 稍為延誤" : "") + "</td>"
+            + "<td>" + (bus.busRemark ? (" " + bus.busRemark) : "") + "</td>"
+            + "</tr>";
+    }
+
+    function buildStopEtaStr(k65Stop, k65AStop) {
+        const k65 = k65Data.busStop.filter(stop => stop.busStopId == k65Stop);
+        const k65A = k65AData.busStop.filter(stop => stop.busStopId == k65AStop);
+
+        var buses = [];
+        if (k65.length != 0)
+            k65[0].bus.forEach((bus) => buses.push(bus));
+
+        if (k65A.length != 0)
+            k65A[0].bus.forEach((bus) => buses.push(bus));
+
+        if (buses.length == 0)
+            return "暫時沒有預定班次";
+
+        buses.sort((a, b) => {
+            return parseInt(a.arrivalTimeInSecond) - parseInt(b.arrivalTimeInSecond);
+        });
+        var displayStr = "";
+
+        for (const bus of buses)
+            displayStr += buildEtaStringByBus(bus);
+
+        return displayStr;
+    }
+
+    function fetchData() {
+        updateData().then(() => {
+            document.getElementById("D020").innerHTML = buildStopEtaStr("K65-D020", "K65A-D020");
+            document.getElementById("U110").innerHTML = buildStopEtaStr("K65-U110", "");
+            document.getElementById("U010").innerHTML = buildStopEtaStr("", "K65A-U010");
+            document.getElementById("U120").innerHTML = buildStopEtaStr("K65-U120", "K65A-U020");
+        });
+    }
+
+    fetchData();
+    setInterval(fetchData, 3000)
+</script>
+
+
+</body>
+</html>
