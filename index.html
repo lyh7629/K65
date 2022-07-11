@@ -89,7 +89,7 @@
 
     function buildEtaStringByBus(bus) {
         var time = new Date();
-        time.setSeconds(time.getSeconds() + parseInt(bus.arrivalTimeText? bus.arrivalTimeInSecond : bus.departureTimeText));
+        time.setSeconds(time.getSeconds() + parseInt(bus.arrivalTimeText? bus.arrivalTimeInSecond : bus.departureTimeInSecond));
         return "<tr><td>" + (bus.lineRef.startsWith("K65A") ? "K65A" : "K65") + "</td>"
             + "<td>#" + bus.busId + "</td>"
             + "<td>" + (bus.arrivalTimeText ? bus.arrivalTimeText : bus.departureTimeText) + "</td>"
