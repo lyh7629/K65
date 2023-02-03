@@ -89,9 +89,9 @@
 
     function buildEtaStringByBus(bus) {
         var time = new Date();
-        const secRemainder = time.getSeconds() % 15
+        const secRemainder = (time.getSeconds() + 6) % 15
 
-        const currentSec = secRemainder == 0 ? time.getSeconds() : time.getSeconds() - secRemainder;
+        const currentSec = secRemainder == 0 ? time.getSeconds() : (time.getSeconds() - secRemainder);
 
         time.setSeconds(currentSec + parseInt(bus.arrivalTimeText? bus.arrivalTimeInSecond : bus.departureTimeInSecond));
         return "<tr><td>" + (bus.lineRef.startsWith("K65A") ? "K65A" : "K65") + "</td>"
@@ -139,7 +139,7 @@
     }
 
     fetchData();
-    setInterval(fetchData, 3000)
+    setInterval(fetchData, 5000)
 </script>
 
 
