@@ -1,147 +1,199 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-    <meta charset="UTF-8"/>
-    <title>K65 ETA</title>
-    <link rel="stylesheet" href="https://unpkg.com/buefy/dist/buefy.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.8.55/css/materialdesignicons.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>K65 ETA</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="https://unpkg.com/buefy/dist/buefy.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.8.55/css/materialdesignicons.min.css">
 </head>
+
 <body>
-<div id="app" class="columns is-mobile">
-    <div class="column">
-        <template>
-            <section>
-                <b-tabs v-model="activeTab">
-                    <b-tab-item label="往天水圍/元朗">
-                        <div class="is-size-4 has-text-weight-bold">
-                            新慶村
-                        </div>
-                        <table class="table" id="D020">
-                        </table>
-                    </b-tab-item>
-                    <b-tab-item label="往流浮山">
-                        <div>
-                            <div class="is-size-4 has-text-weight-bold">
-                                輕鐵坑尾村站
-                            </div>
-                            <table id="U110" class="table">
-                            </table>
-                        </div>
-                        <br>
-                        <div>
-                            <div class="is-size-4 has-text-weight-bold">
-                                天水圍站 (輕鐵天水圍站)
-                            </div>
-                            <table id="U010" class="table">
-                            </table>
-                        </div>
-                        <br>
-                        <div>
-                            <div class="is-size-4 has-text-weight-bold">
-                                天盛苑 (港鐵天水圍站)
-                            </div>
-                            <table id="U120" class="table"></table>
-                        </div>
-                    </b-tab-item>
-                </b-tabs>
-            </section>
-        </template>
+  <main>
+    <div id="app">
+      <template>
+        <section>
+          <b-tabs type="is-boxed" position="is-centered">
+            <b-tab-item v-for="bound in directions" :label="bound.name">
+              <div v-for="stop in bound.stops">
+                <div class="is-size-4 has-text-weight-bold">
+                  {{ stop.stopName }}
+                </div>
+                <div v-if="stop.eta.length > 0">
+                  <b-table :data="stop.eta" :mobile-cards="false">
+                    <b-table-column field="route" label="線路" width="15%" v-slot="props">
+                      {{ props.row.route }}
+                    </b-table-column>
+                    <b-table-column field="busId" label="車牌" width="15%" v-slot="props">
+                      {{ props.row.busId }}
+                    </b-table-column>
+                    <b-table-column field="etaText" label="到站時間" width="23%" v-slot="props">
+                      {{ props.row.etaText }}
+                    </b-table-column>
+                    <b-table-column field="detailTime" label="詳細時間" width="30%" v-slot="props">
+                      {{ props.row.detailTime.toLocaleTimeString() }}
+                    </b-table-column>
+                    <b-table-column field="busRemark" label="備註" width="17%" v-slot="props">
+                      {{ props.row.busRemark }}
+                    </b-table-column>
+                  </b-table>
+                </div>
+                <div v-else>
+                  <h1>暫時沒有預定班次</h1>
+                </div>
+                <br>
+              </div>
+          </b-tabs>
+        </section>
+      </template>
     </div>
-</div>
+  </main>
 
-<script src="https://unpkg.com/vue@2"></script>
-<!-- Full bundle -->
-<script src="https://unpkg.com/buefy/dist/buefy.min.js"></script>
+  <script src="js/app.js"></script>
 
-<!-- Individual components -->
-<script src="https://unpkg.com/buefy/dist/components/table"></script>
-<script src="https://unpkg.com/buefy/dist/components/input"></script>
+  <script src="https://unpkg.com/vue@2"></script>
+  <!-- Full bundle -->
+  <script src="https://unpkg.com/buefy/dist/buefy.min.js"></script>
 
-<script>
+  <!-- Individual components -->
+  <script src="https://unpkg.com/buefy/dist/components/table"></script>
+  <script src="https://unpkg.com/buefy/dist/components/input"></script>
+
+  <script>
     new Vue({
-        el: '#app',
-        data: {},
-        method: {}
-    });
+      el: '#app',
+      data: {
+        routes: ['K65', 'K65A'],
+        directions: [
+          outbound = {
+            name: '往天水圍/元朗',
+            stops: [
+              {
+                id: 'D020',
+                stopName: '新慶村',
+                stopIds: [
+                  'K65-D020',
+                  'K65A-D020'
+                ],
+                eta: []
+              },
+            ]
+          },
+          inbound = {
+            name: '往流浮山',
+            stops: [
+              {
+                id: 'U110',
+                stopName: '輕鐵坑尾村站',
+                stopIds: [
+                  'K65-U110'
+                ],
+                eta: []
+              },
+              {
+                id: 'U010',
+                stopName: '天水圍站 (輕鐵天水圍站)',
+                stopIds: [
+                  'K65A-U010'
+                ],
+                eta: []
+              },
+              {
+                id: 'U120',
+                stopName: '天盛苑 (港鐵天水圍站)',
+                stopIds: [
+                  'K65-U120',
+                  'K65A-U020'
+                ],
+                eta: []
+              },
+            ]
+          }
+        ],
+      },
+      computed: {
+      },
+      beforeMount() {
+        console.log("beforeMount");
+        console.log(this.routes);
+        this.fetchData();
+        setInterval(() => {
+          this.fetchData();
+        }, 5000);
+      },
+      methods: {
+        async fetchData() {
+          this.routes.forEach(async (route) => {
+            const routeData = await this.fetchLineEta(route);
+            this.directions.forEach((bound) => {
+              bound.stops.forEach((stop) => {
+                stop.stopIds.forEach((stopId) => {
+                  const stopData = routeData.busStop.filter((stopData) => stopData.busStopId == stopId);
+                  if (stopData.length == 0) return;
 
-    var k65Data = fetchLineEta("K65");
-    var k65AData = fetchLineEta("K65A");
+                  if (stop.eta)
+                    stop.eta = stop.eta.filter((eta) => eta.route != route);
 
-    async function fetchLineEta(line) {
-        let respond = await fetch('https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule', {
+
+                  // build eta
+                  const eta = stopData[0].bus.map((bus) => {
+                    var time = new Date();
+                    const secRemainder = (time.getSeconds() + 6) % 15
+
+                    const currentSec = secRemainder == 0 ? time.getSeconds() : (time.getSeconds() - secRemainder);
+                    time.setSeconds(currentSec + parseInt(bus.arrivalTimeText ? bus.arrivalTimeInSecond : bus.departureTimeInSecond));
+
+                    return {
+                      route: routeData.routeName,
+                      busId: bus.busId,
+                      etaText: bus.arrivalTimeText ? bus.arrivalTimeText : bus.departureTimeText,
+                      detailTime: time,
+                      busRemark: this.buildRemarkStr(bus)
+                    }
+                  });
+
+                  // add and sort eta
+                  stop.eta = [...stop.eta, ...eta];
+                  stop.eta.sort((a, b) => {
+                    return a.detailTime - b.detailTime;
+                  });
+                });
+              });
+            });
+          });
+        },
+        async fetchLineEta(line) {
+          let respond = await fetch('https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule', {
             method: "POST",
             headers: {
-                "Content-Type": "application/json"
+              "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                "language": "zh",
-                "routeName": line
+              "language": "zh",
+              "routeName": line
             })
-        });
+          });
 
-        return await respond.json();
-    }
+          return await respond.json();
+        },
+        buildRemarkStr(bus) {
+          const remarkList = [
+            bus.isScheduled == 1 ? "預定班次" : "",
+            bus.isDelayed == 1 ? "稍為延誤" : "",
+            bus.busRemark ?? ""
+          ];
 
-    async function updateData() {
-        k65Data = await fetchLineEta("K65");
-        k65AData = await fetchLineEta("K65A");
-    }
-
-    function buildEtaStringByBus(bus) {
-        var time = new Date();
-        const secRemainder = (time.getSeconds() + 6) % 15
-
-        const currentSec = secRemainder == 0 ? time.getSeconds() : (time.getSeconds() - secRemainder);
-
-        time.setSeconds(currentSec + parseInt(bus.arrivalTimeText? bus.arrivalTimeInSecond : bus.departureTimeInSecond));
-        return "<tr><td>" + (bus.lineRef.startsWith("K65A") ? "K65A" : "K65") + "</td>"
-            + "<td>#" + bus.busId + "</td>"
-            + "<td>" + (bus.arrivalTimeText ? bus.arrivalTimeText : bus.departureTimeText) + "</td>"
-            + "<td>(" + time.toLocaleTimeString() + ")</td>"
-            + "<td>" + (bus.isScheduled == 1 ? " 預定班次" : "") + "</td>"
-            + "<td>" + (bus.isDelayed == 1 ? " 稍為延誤" : "") + "</td>"
-            + "<td>" + (bus.busRemark ? (" " + bus.busRemark) : "") + "</td>"
-            + "</tr>";
-    }
-
-    function buildStopEtaStr(k65Stop, k65AStop) {
-        const k65 = k65Data.busStop.filter(stop => stop.busStopId == k65Stop);
-        const k65A = k65AData.busStop.filter(stop => stop.busStopId == k65AStop);
-
-        var buses = [];
-        if (k65.length != 0)
-            k65[0].bus.forEach((bus) => buses.push(bus));
-
-        if (k65A.length != 0)
-            k65A[0].bus.forEach((bus) => buses.push(bus));
-
-        if (buses.length == 0)
-            return "暫時沒有預定班次";
-
-        buses.sort((a, b) => {
-            return parseInt(a.arrivalTimeInSecond) - parseInt(b.arrivalTimeInSecond);
-        });
-        var displayStr = "";
-
-        for (const bus of buses)
-            displayStr += buildEtaStringByBus(bus);
-
-        return displayStr;
-    }
-
-    function fetchData() {
-        updateData().then(() => {
-            document.getElementById("D020").innerHTML = buildStopEtaStr("K65-D020", "K65A-D020");
-            document.getElementById("U110").innerHTML = buildStopEtaStr("K65-U110", "");
-            document.getElementById("U010").innerHTML = buildStopEtaStr("", "K65A-U010");
-            document.getElementById("U120").innerHTML = buildStopEtaStr("K65-U120", "K65A-U020");
-        });
-    }
-
-    fetchData();
-    setInterval(fetchData, 5000)
-</script>
+          const remark = remarkList.filter((remark) => remark != "");
+          
+          return remark.join(' / ');
+        }
+      }
+    });
+  </script>
 
 
 </body>
+
 </html>
