@@ -6,62 +6,211 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>K65 ETA</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="https://unpkg.com/buefy/dist/buefy.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.8.55/css/materialdesignicons.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-router/6.21.0/react-router.production.min.js"
+    integrity="sha512-lC1wfkttgEpBOZxbHADBEscmWP7x9CLBpVt5STN/JCWyRyNFgjLB4qBJKKMNpDsQK3p8sDYejbqn23F0ick0rQ=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-bootstrap@next/dist/react-bootstrap.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-redux@8.0.5/dist/react-redux.min.js"></script>
+  <script src="https://unpkg.com/@reduxjs/toolkit@1.9.7/dist/redux-toolkit.umd.js"></script>
 </head>
 
 <body>
   <main>
-    <div id="app">
-      <template>
-        <section>
-          <b-tabs type="is-boxed" position="is-centered">
-            <b-tab-item v-for="bound in directions" :label="bound.name">
-              <div v-for="stop in bound.stops">
-                <div class="is-size-4 has-text-weight-bold">
-                  {{ stop.stopName }}
-                </div>
-                <div v-if="stop.eta.length > 0">
-                  <b-table :data="stop.eta" :mobile-cards="false">
-                    <b-table-column field="route" label="線路" width="15%" v-slot="props">
-                      {{ props.row.route }}
-                    </b-table-column>
-                    <b-table-column field="busId" label="車牌" width="15%" v-slot="props">
-                      {{ props.row.busId }}
-                    </b-table-column>
-                    <b-table-column field="etaText" label="到站時間" width="23%" v-slot="props">
-                      {{ props.row.etaText }}
-                    </b-table-column>
-                    <b-table-column field="detailTime" label="詳細時間" width="30%" v-slot="props">
-                      {{ props.row.detailTime.toLocaleTimeString() }}
-                    </b-table-column>
-                    <b-table-column field="busRemark" label="備註" width="17%" v-slot="props">
-                      {{ props.row.busRemark }}
-                    </b-table-column>
-                  </b-table>
-                </div>
-                <div v-else>
-                  <h1>暫時沒有預定班次</h1>
-                </div>
-                <br>
-              </div>
-          </b-tabs>
-        </section>
-      </template>
-    </div>
+    <div id="root"></div>
   </main>
 
   <script src="js/app.js"></script>
+  <script type="text/babel">
+    const { useEffect, useState, useContext, createContext } = React
+    const { Stack } = ReactBootstrap
+    const { useDispatch, useSelector, Provider } = ReactRedux;
+    const { configureStore, createSlice } = RTK
 
-  <script src="https://unpkg.com/vue@2"></script>
-  <!-- Full bundle -->
-  <script src="https://unpkg.com/buefy/dist/buefy.min.js"></script>
+    const etaSlice = createSlice({
+      name: 'eta',
+      initialState: {
+        routes: [],
+        etas: [],
+      },
+      reducers: {
+        addRoutes: (state, action) => {
+          state.routes.push(...action.payload);
+        },
+        removeRoutes: (state, action) => {
+          action.forEach(route => {
+            const index = state.routes.findIndex(route => route.id === action.payload)
+            if (index !== -1) {
+              state.routes = [
+                ...state.routes.slice(0, index),
+                ...state.routes.slice(index + 1)
+              ]
+            }
+          })
+        },
+      }
+    })
 
-  <!-- Individual components -->
-  <script src="https://unpkg.com/buefy/dist/components/table"></script>
-  <script src="https://unpkg.com/buefy/dist/components/input"></script>
+    const { addRoutes, removeRoutes } = etaSlice.actions
+
+    const store = configureStore({
+      reducer: etaSlice.reducer
+    })
+
+    const useEtaUpdater = (interval = 5000) => {
+      const dispatch = useDispatch()
+      const routes = useSelector(state => state.routes)
+
+      const fetchETA = async (route) => {
+        let respond = await fetch('https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule', {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            "language": "zh",
+            "routeName": route + ""
+          })
+        })
+
+        return await respond.json();
+      }
+
+      const fetchETAs = async (routes) => await Promise.all(routes.map(route => fetchETA(route)))
+
+      useEffect(() => {
+        let intervalId;
+
+        const fetchETAForRoutes = async () => {
+          try {
+            const etaData = await fetchETAs(routes)
+            // Update the ETA data in the Redux store
+            dispatch(updateETA(etaData));
+          } catch (error) {
+            console.error('Error fetching ETA:', error);
+          }
+        }
+
+        const startFetchingETA = () => {
+          fetchETAForRoutes()
+
+          intervalId = setInterval(() => {
+            fetchETAForRoutes()
+          }, interval)
+        }
+
+        const stopFetchingETA = () => {
+          clearInterval(intervalId);
+        }
+
+        if (routes.length > 0) {
+          startFetchingETA()
+        } else {
+          stopFetchingETA()
+        }
+
+        return () => {
+          stopFetchingETA()
+        }
+      }, [dispatch, routes, interval])
+
+      return null
+    };
+
+    const init = [
+      {
+        id: 'D020',
+        title: '新慶村',
+        data: [
+          {
+            route: 'K65',
+            stop: 'K65-D020'
+          },
+          {
+            route: 'K65A',
+            stop: 'K65A-D020'
+          },
+        ]
+      },
+      {
+
+        id: 'D020',
+        title: '新慶村',
+        data: [
+          {
+            route: 'K65',
+            stop: 'K65-D020'
+          },
+          {
+            route: 'K65A',
+            stop: 'K65A-D020'
+          },
+        ]
+      },
+    ]
+
+    function Root() {
+      return (
+        <Provider store={store}>
+          <Home />
+        </Provider>
+      )
+    }
+
+    function Home() {
+      const SavedGroupsContext = createContext(init)
+      useEtaUpdater()
+
+      return (
+        <SavedGroup group={init[0]} />
+      )
+    }
+
+    function Greetings() {
+      return <h1>Hello readers, Thankyou for reading this blog !</h1>;
+    }
+
+    function SavedGroup({ group }) {
+      const dispatch = useDispatch()
+
+      // Dispatch the addRoute action whenthe SavedGroup component is rendered
+      useEffect(() => {
+        // Assuming the group object has a route ID
+        dispatch(addRoutes(group.data.map(d => d.route)))
+
+        return () => {
+          // Dispatch the removeRoute action when the SavedGroup component is unmounted
+          dispatch(removeRoutes(group.routeId))
+        };
+      }, [dispatch, group.routeId]);
+
+      return (
+        <Stack gap={3}>
+          <h2>{group.title}</h2>
+        </Stack>
+      )
+    }
+
+    ReactDOM.render(
+      (
+        <Root />
+      ),
+      document.getElementById("root")
+    );
+  </script>
 
   <script>
+    console.log(ReactRouterDOM);
     new Vue({
       el: '#app',
       data: {
@@ -186,7 +335,7 @@
           ];
 
           const remark = remarkList.filter((remark) => remark != "");
-          
+
           return remark.join(' / ');
         }
       }
