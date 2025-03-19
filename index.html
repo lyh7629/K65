@@ -1,199 +1,24 @@
-<!DOCTYPE html>
-<html>
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>K65 ETA</title>
-  <link rel="manifest" href="manifest.json" />
-  <link rel="stylesheet" href="https://unpkg.com/buefy/dist/buefy.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.8.55/css/materialdesignicons.min.css">
-</head>
-
-<body>
-  <main>
-    <div id="app">
-      <template>
-        <section>
-          <b-tabs type="is-boxed" position="is-centered">
-            <b-tab-item v-for="bound in directions" :label="bound.name">
-              <div v-for="stop in bound.stops">
-                <div class="is-size-4 has-text-weight-bold">
-                  {{ stop.stopName }}
-                </div>
-                <div v-if="stop.eta.length > 0">
-                  <b-table :data="stop.eta" :mobile-cards="false">
-                    <b-table-column field="route" label="線路" width="15%" v-slot="props">
-                      {{ props.row.route }}
-                    </b-table-column>
-                    <b-table-column field="busId" label="車牌" width="15%" v-slot="props">
-                      {{ props.row.busId }}
-                    </b-table-column>
-                    <b-table-column field="etaText" label="到站時間" width="23%" v-slot="props">
-                      {{ props.row.etaText }}
-                    </b-table-column>
-                    <b-table-column field="detailTime" label="詳細時間" width="30%" v-slot="props">
-                      {{ props.row.detailTime.toLocaleTimeString() }}
-                    </b-table-column>
-                    <b-table-column field="busRemark" label="備註" width="17%" v-slot="props">
-                      {{ props.row.busRemark }}
-                    </b-table-column>
-                  </b-table>
-                </div>
-                <div v-else>
-                  <h1>暫時沒有預定班次</h1>
-                </div>
-                <br>
-              </div>
-          </b-tabs>
-        </section>
-      </template>
-    </div>
-  </main>
-
-  <script src="js/app.js"></script>
-
-  <script src="https://unpkg.com/vue@2"></script>
-  <!-- Full bundle -->
-  <script src="https://unpkg.com/buefy/dist/buefy.min.js"></script>
-
-  <!-- Individual components -->
-  <script src="https://unpkg.com/buefy/dist/components/table"></script>
-  <script src="https://unpkg.com/buefy/dist/components/input"></script>
-
-  <script>
-    new Vue({
-      el: '#app',
-      data: {
-        routes: ['K65', 'K65A'],
-        directions: [
-          outbound = {
-            name: '往天水圍/元朗',
-            stops: [
-              {
-                id: 'D020',
-                stopName: '新慶村',
-                stopIds: [
-                  'K65-D020',
-                  'K65A-D020'
-                ],
-                eta: []
-              },
-            ]
-          },
-          inbound = {
-            name: '往流浮山',
-            stops: [
-              {
-                id: 'U110',
-                stopName: '輕鐵坑尾村站',
-                stopIds: [
-                  'K65-U110'
-                ],
-                eta: []
-              },
-              {
-                id: 'U010',
-                stopName: '天水圍站 (輕鐵天水圍站)',
-                stopIds: [
-                  'K65A-U010'
-                ],
-                eta: []
-              },
-              {
-                id: 'U120',
-                stopName: '天盛苑 (港鐵天水圍站)',
-                stopIds: [
-                  'K65-U120',
-                  'K65A-U020'
-                ],
-                eta: []
-              },
-            ]
-          }
-        ],
-      },
-      computed: {
-      },
-      beforeMount() {
-        console.log("beforeMount");
-        console.log(this.routes);
-        this.fetchData();
-        setInterval(() => {
-          this.fetchData();
-        }, 5000);
-      },
-      methods: {
-        async fetchData() {
-          this.routes.forEach(async (route) => {
-            const routeData = await this.fetchLineEta(route);
-            this.directions.forEach((bound) => {
-              bound.stops.forEach((stop) => {
-                stop.stopIds.forEach((stopId) => {
-                  const stopData = routeData.busStop.filter((stopData) => stopData.busStopId == stopId);
-                  if (stopData.length == 0) return;
-
-                  if (stop.eta)
-                    stop.eta = stop.eta.filter((eta) => eta.route != route);
-
-
-                  // build eta
-                  const eta = stopData[0].bus.map((bus) => {
-                    var time = new Date();
-                    const secRemainder = (time.getSeconds() + 6) % 15
-
-                    const currentSec = secRemainder == 0 ? time.getSeconds() : (time.getSeconds() - secRemainder);
-                    time.setSeconds(currentSec + parseInt(bus.arrivalTimeText ? bus.arrivalTimeInSecond : bus.departureTimeInSecond));
-
-                    return {
-                      route: routeData.routeName,
-                      busId: bus.busId,
-                      etaText: bus.arrivalTimeText ? bus.arrivalTimeText : bus.departureTimeText,
-                      detailTime: time,
-                      busRemark: this.buildRemarkStr(bus)
-                    }
-                  });
-
-                  // add and sort eta
-                  stop.eta = [...stop.eta, ...eta];
-                  stop.eta.sort((a, b) => {
-                    return a.detailTime - b.detailTime;
-                  });
-                });
-              });
-            });
-          });
-        },
-        async fetchLineEta(line) {
-          let respond = await fetch('https://rt.data.gov.hk/v1/transport/mtr/bus/getSchedule', {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              "language": "zh",
-              "routeName": line
-            })
-          });
-
-          return await respond.json();
-        },
-        buildRemarkStr(bus) {
-          const remarkList = [
-            bus.isScheduled == 1 ? "預定班次" : "",
-            bus.isDelayed == 1 ? "稍為延誤" : "",
-            bus.busRemark ?? ""
-          ];
-
-          const remark = remarkList.filter((remark) => remark != "");
-          
-          return remark.join(' / ');
-        }
-      }
-    });
-  </script>
-
-
-</body>
-
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+    />
+    <link rel="manifest" href="manifest.json" />
+    <title>K65 ETA</title>
+    <script type="module" crossorigin src="/K65/assets/index-CUhdw6ca.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
