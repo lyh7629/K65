@@ -1,0 +1,7 @@
+{
+  "name": "K65 ETA",
+  "short_name": "K65",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary"
+}
